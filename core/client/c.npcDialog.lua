@@ -7,10 +7,13 @@ local talkSettings = {
     endTime = 0,
 }
 
+-- NOTE: HTML works everywhere text is displayed - npc name, role, dialog text and
+--       every grid title / badge / button label. The dialog typing animation keeps
+--       HTML tags intact, e.g. text = "Reach <b style='color:#fdd140;'>new heights</b>".
 local exampleDialog = {
     npc = {
-        name = "Bob Grass",
-        role = "Citizen",
+        name = "Bob <span style='color:#fdd140;'>Grass</span>", -- @string (required) supports HTML
+        role = "Citizen", -- @string (required) supports HTML
         icon = 'fas fa-user',
         camera = { -- @table (optional) camera settings for npc dialog
             distance = 0.85, -- @number (optional) camera distance from npc, default 0.85
@@ -27,12 +30,21 @@ local exampleDialog = {
         },
     },
     soundFile = 'https://upload.devhub.gg/dh_upload/soundSample.mp3', -- @string (optional) sound file URL to play when dialog opens
-    text = "We are happy to present the new devhub script license manager. Take your server to new heights with our unique features, making what was previously impossible a reality. Features include a license generator, fake license creation, license stealing detection, and a license scanner, among many others.",
+    -- @string (required) dialog text - supports HTML; the typing animation reveals it one visible character at a time while keeping tags intact
+    text = "We are happy to present the <b style='color:#fdd140;'>new devhub script license manager</b>. Take your server to <b>new heights</b> with our unique features, making what was previously impossible a reality.",
+    requiredItem = { -- @table (optional) shows required item card(s) in the dialog (display only - nothing is checked)
+        text = "Required Items", -- @string (optional) caption shown above the items, supports HTML
+        items = { -- @table list of items to display
+            { name = 'water', amount = 1 }, -- name @string (required); amount @number (optional, default 1)
+            { name = 'bread', amount = 2 }, -- label / img @string (optional) override the auto-resolved values
+        },
+        -- a single item also works: requiredItem = { name = 'water', amount = 1 }
+    },
     grid = {
         {
             uid = "talk_bob", -- @string (required) unique identifier for the option
             icon = 'fas fa-comment', -- @string (required) fontawesome icon class
-            title = "Talk to Bob",  -- @string (required) option title, can be html
+            title = "Talk to <b>Bob</b>",  -- @string (required) option title, supports HTML
             badge = { -- @table (optional) badge config
                 text = "Aggressive action", -- @string (optional) can be html
                 color = "#ff0000", -- @string (optional) badge background color
@@ -163,7 +175,9 @@ Core.NpcDialog = function(entity, dialogData)
         -- Calculate speech duration and make ped speak
         if dialogData.text then
             local typingSpeedMs = 30 -- milliseconds per character (matches Vue component)
-            talkSettings.textLength = string.len(dialogData.text)
+            -- Count only visible characters so HTML tags don't inflate the speech duration
+            local visibleText = dialogData.text:gsub("<[^>]*>", "")
+            talkSettings.textLength = string.len(visibleText)
             local speechDuration = (talkSettings.textLength * typingSpeedMs) -- duration in milliseconds
             
             -- Create a thread to manage mouth movement
@@ -219,6 +233,25 @@ Core.NpcDialog = function(entity, dialogData)
             end
         end
         
+        -- Resolve required item(s) display data (display only - nothing is checked)
+        if dialogData.requiredItem then
+            local req = dialogData.requiredItem
+            -- Accept a single item ({ name = ... }) or a list ({ items = { ... } })
+            if not req.items and req.name then
+                req.items = { { name = req.name, amount = req.amount, label = req.label, img = req.img } }
+            end
+            if req.items then
+                for _, item in ipairs(req.items) do
+                    if item.name then
+                        local itemData = Core.GetItemData(item.name)
+                        item.label = item.label or (itemData and itemData.label) or item.name
+                        item.img = item.img or (itemData and itemData.img) or ""
+                        item.amount = item.amount or 1
+                    end
+                end
+            end
+        end
+
         -- Store the promise resolver for callbacks to use
         activeDialogPromise = resolve
         
@@ -295,3 +328,166 @@ RegisterNUICallback('npcDialogClose', function(data, cb)
     cb('ok')
     Core.CloseNpcDialog()
 end)
+
+-- ============================================================================
+-- NPC DIALOG - FULL TEST
+-- Spawns a test ped at -1193.4369, -1586.5612, 4.3703 with a target that runs a
+-- maxed-out npc dialog flow (every window type + every option).
+-- >> Comment out this whole do ... end block to disable the test. <<
+-- ============================================================================
+-- do
+--     local testPed
+--     local testRunning = false
+
+--     local function runFullNpcDialogTest()
+--         if testRunning then return end
+--         if not testPed or not DoesEntityExist(testPed) then return end
+--         testRunning = true
+
+--         -- Fully configured npc (camera + animation)
+--         local npc = {
+--             name = "Devhub <span style='color:#fdd140;'>Tester</span>", -- HTML supported
+--             role = "QA Department",
+--             icon = 'fas fa-vial',
+--             camera = {
+--                 distance = 0.9,
+--                 height = 0.6,
+--             },
+--             animation = {
+--                 dict = "gestures@m@standing@casual",
+--                 name = "gesture_hello",
+--                 blendIn = 8.0,
+--                 blendOut = -8.0,
+--                 duration = -1,
+--                 flag = 1,
+--                 playbackRate = 0,
+--             },
+--         }
+
+--         while true do
+--             -- MAIN GRID - HTML text, multi-item requiredItem, badges & spans
+--             local result = Core.NpcDialog(testPed, {
+--                 npc = npc,
+--                 soundFile = 'https://upload.devhub.gg/dh_upload/soundSample.mp3',
+--                 text = "Welcome to the <b style='color:#fdd140;'>full npc dialog test</b>. Every window type and option is wired up here - pick one to try it out.",
+--                 requiredItem = {
+--                     text = "For this job you will need",
+--                     items = {
+--                         { name = 'water', amount = 2 },
+--                         { name = 'bread', amount = 1 },
+--                         { name = 'weapon_pistol', amount = 1 },
+--                     },
+--                 },
+--                 grid = {
+--                     { uid = 'win_input',   icon = 'fas fa-keyboard',    title = "Input <b>window</b>", badge = { text = 'number', color = '#3b82f6' }, span = 2 },
+--                     { uid = 'win_items',   icon = 'fas fa-box-open',    title = "Items window" },
+--                     { uid = 'win_payment', icon = 'fas fa-credit-card', title = "Payment window" },
+--                     { uid = 'goodbye',     icon = 'fas fa-door-open',   title = "Goodbye", badge = { text = 'exit', color = '#ef4444' }, span = 2 },
+--                 },
+--             })
+
+--             if not result.status then break end          -- dialog closed by the player
+--             if result.data == 'goodbye' then break end
+
+--             if result.data == 'win_input' then
+--                 -- INPUT WINDOW - number type, min/max, live hints
+--                 local r = Core.NpcDialog(testPed, {
+--                     npc = npc,
+--                     text = "Input window - type a number, the hint updates live.",
+--                     input = {
+--                         type = "number",
+--                         default = 50,
+--                         text = "I can give you %s dollars.",
+--                         buttonText = "Give <b>money</b>",
+--                         inputWidth = "3vw",
+--                         min = 1,
+--                         max = 1000,
+--                         maxLength = 7,
+--                         hint = {
+--                             number = {
+--                                 [5] = "A small amount",
+--                                 [50] = "A moderate amount",
+--                                 [500] = "A large amount",
+--                                 [1000] = "An extremely large amount",
+--                             },
+--                             text = {
+--                                 ['orange'] = "Orange is not what im looking for",
+--                                 ['banana'] = "Banana is what i need",
+--                             },
+--                         },
+--                     },
+--                 })
+--                 print("^3[npcDialogTest]^7 input result:", tostring(r.status), json.encode(r.data))
+--                 if not r.status then break end
+--             elseif result.data == 'win_items' then
+--                 -- ITEMS WINDOW - select / buy / sell examples
+--                 local r = Core.NpcDialog(testPed, {
+--                     npc = npc,
+--                     text = "Items window - select, buy and sell examples.",
+--                     items = {
+--                         buttonText = "Confirm",
+--                         selectMultiple = true,
+--                         items = {
+--                             { name = 'water', max = 99999 },
+--                             { name = 'bread', max = 5, default = 1, price = 25 },
+--                             { name = 'weapon_pistol', price = 500 },
+--                         },
+--                     },
+--                 })
+--                 print("^3[npcDialogTest]^7 items result:", tostring(r.status), json.encode(r.data))
+--                 if not r.status then break end
+--             elseif result.data == 'win_payment' then
+--                 -- PAYMENT WINDOW - cash / card toggle
+--                 local r = Core.NpcDialog(testPed, {
+--                     npc = npc,
+--                     text = "Payment window - choose how you would like to pay.",
+--                     paymentMethod = {
+--                         default = "cash",
+--                         buttonText = "Proceed",
+--                         cashLabel = "Cash",
+--                         cardLabel = "Card",
+--                         cashIcon = "fas fa-money-bill-wave",
+--                         cardIcon = "fas fa-credit-card",
+--                     },
+--                 })
+--                 print("^3[npcDialogTest]^7 payment result:", tostring(r.status), json.encode(r.data))
+--                 if not r.status then break end
+--             end
+--         end
+
+--         Core.CloseNpcDialog()
+--         testRunning = false
+--     end
+
+--     RegisterNetEvent('dh_lib:client:npcDialogTest:open', function()
+--         CreateThread(runFullNpcDialogTest)
+--     end)
+
+--     CreateThread(function()
+--         while not Core.Loaded do Wait(200) end
+
+--         local pedModel = `a_m_m_business_01`
+--         Core.RequestModel(pedModel)
+--         testPed = CreatePed(4, pedModel, -1193.4369, -1586.5612, 4.3703, 180.0, false, true)
+--         SetEntityAsMissionEntity(testPed, true, true)
+--         SetEntityInvincible(testPed, true)
+--         SetBlockingOfNonTemporaryEvents(testPed, true)
+--         FreezeEntityPosition(testPed, true)
+--         SetModelAsNoLongerNeeded(pedModel)
+
+--         Core.AddLocalEntityToTarget(testPed, {
+--             name = 'dh_npcdialog_test',
+--             icon = 'fas fa-vial',
+--             label = 'NPC Dialog Test',
+--             event = 'dh_lib:client:npcDialogTest:open',
+--             handler = function() return true end,
+--         })
+--     end)
+
+--     AddEventHandler('onResourceStop', function(resourceName)
+--         if resourceName == GetCurrentResourceName() and testPed and DoesEntityExist(testPed) then
+--             DeleteEntity(testPed)
+--         end
+--     end)
+-- end
+-- -- ============================ END NPC DIALOG TEST ===========================

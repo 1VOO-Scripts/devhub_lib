@@ -1,6 +1,9 @@
 if Shared.InventorySystem ~= "qs-inventory" then return end  
-local Items = exports['qs-inventory']:GetItemList()
+local Items = nil
 Core.GetItemData = function(itemName) 
+    if not Items then
+        Items = exports['qs-inventory']:GetItemList()
+    end
     local itemData = Items[itemName]
     if not itemData then return nil end
     return { 

@@ -1,7 +1,9 @@
 if Shared.InventorySystem ~= "core_inventory" then return end  
-local allItems = exports['core_inventory']:getItemsList()
+local allItems = nil
 Core.GetItemData = function(itemName) 
-    -- TODO this inventory does not have a method to get item data directly
+    if not allItems then
+        allItems = exports['core_inventory']:getItemsList()
+    end
     local data = allItems[itemName]
     return { 
         name = itemName,

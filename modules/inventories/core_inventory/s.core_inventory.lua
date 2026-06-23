@@ -1,9 +1,21 @@
 if Shared.InventorySystem ~= "core_inventory" then return end  
 
 Core.RegisterItem = function(item, func)
-    exports.core_inventory:registerUsableItem(item, function(source, itemData)
-        func(source, itemData.slot, itemData.metadata or itemData.info or {})
-    end)
+    if Shared.Framework == "ESX" then
+        -- Framework usable items are invoked as cb(source, itemName, slotData);
+        -- forward the slot index and metadata so handlers get (source, slot, metadata).
+        ESX.RegisterUsableItem(item, function(playerId, _, slotData)
+            func(playerId, slotData and slotData.slot, slotData and (slotData.metadata or slotData.info) or {})
+        end)
+    elseif Shared.Framework == "QBCore" then
+        QBCore.Functions.CreateUseableItem(item, function(source, slotData)
+            func(source, slotData and slotData.slot, slotData and (slotData.metadata or slotData.info) or {})
+        end)
+     elseif Shared.Framework == "QBOX" then
+        exports.qbx_core:CreateUseableItem(item, function(source, slotData)
+            func(source, slotData and slotData.slot, slotData and (slotData.metadata or slotData.info) or {})
+        end)
+    end
 end
 
 Core.RegisterServerCallback('dh_lib:server:getItemData', function(source, cb, itemName)
@@ -27,10 +39,10 @@ Core.GetAllItems = function(source)
 end
 
 Core.GetItemData = function(itemName)
-    local itemData = exports.core_inventory:GetItemData(itemName)
+    local itemData = exports.core_inventory:getItem(itemName)
     if not itemData then return nil end
     return {
-        label = itemData.label or itemName,
+        label = itemData.name or itemName,
         img = string.format("https://cfx-nui-codem-inventory/html/img/%s.png", itemName),
     }
 end

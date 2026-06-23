@@ -269,21 +269,23 @@ function Core.ShowProgressbar(data, cb)
             placement = placement,
             duration = duration
         })
-        if canStop then 
-            while progressbarCb == nil do 
-                if IsControlJustPressed(0, 73) then 
+        if canStop then
+            while progressbarCb == nil do
+                if IsControlJustPressed(0, 73) then
                     SendNUIMessage({
                         type = "progressbar",
                         close = true
                     })
-                    if cb then 
+                    progressbarCb = nil
+                    progressbarBusy = false
+                    if cb then
                         cb(false)
                     end
                     return false
                 end
                 Wait(1)
             end
-        else 
+        else
             while progressbarCb == nil do 
                 Wait(50)
             end

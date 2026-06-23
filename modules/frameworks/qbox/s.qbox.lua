@@ -75,11 +75,34 @@ CreateThread(function()
     end
 
     Core.GetUserSkin = function(source)
-        local xPlayer = exports.qbx_core:GetPlayer(tonumber(source))
-        local result Core.SQL.AwaitExecute('SELECT * FROM playerskins WHERE citizenid = ? AND active = ?', { xPlayer.PlayerData.citizenid, 1 })
+        local xPlayer = QBCore.Functions.GetPlayer(tonumber(source))
+        if not xPlayer then
+            return { eyesColor = 0, skinColor = 0 }
+        end
+
+        local result = Core.SQL.AwaitSingle('SELECT skin FROM playerskins WHERE citizenid = ? AND active = ? LIMIT 1', { xPlayer.PlayerData.citizenid, 1 })
+        local skin = result?.skin or {}
+        if type(skin) == "string" then
+            local ok, decoded = pcall(json.decode, skin)
+            skin = ok and decoded or {}
+        end
+
+        local function numberFrom(...)
+            for i = 1, select("#", ...) do
+                local value = select(i, ...)
+                if type(value) == "table" then
+                    value = value.texture or value.value or value.item
+                end
+                value = tonumber(value)
+                if value then return value end
+            end
+
+            return 0
+        end
+
         return {
-            eyesColor = result?.skin?.eyes_color?.texture or 0, -- number
-            skinColor = result?.skin?.facemix?.skinMix or 0, -- number
+            eyesColor = numberFrom(skin?.eyes_color, skin?.eye_color, skin?.eyesColor, skin?.eyeColor), -- number
+            skinColor = numberFrom(skin?.facemix?.skinMix, skin?.headBlend?.skinMix, skin?.skin_color, skin?.skinColor), -- number
         }
     end
 

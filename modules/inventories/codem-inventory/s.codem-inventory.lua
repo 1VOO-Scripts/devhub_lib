@@ -1,17 +1,19 @@
 if Shared.InventorySystem ~= "codem-inventory" then return end  
 
 Core.RegisterItem = function(item, func)
-    if Shared.Framework == "ESX" then 
-        ESX.RegisterUsableItem(item, function(playerId)
-            func(playerId)
+    if Shared.Framework == "ESX" then
+        -- Framework usable items are invoked as cb(source, itemName, slotData);
+        -- forward the slot index and metadata so handlers get (source, slot, metadata).
+        ESX.RegisterUsableItem(item, function(playerId, _, slotData)
+            func(playerId, slotData and slotData.slot, slotData and (slotData.metadata or slotData.info) or {})
         end)
     elseif Shared.Framework == "QBCore" then
-        QBCore.Functions.CreateUseableItem(item, function(source, item)
-            func(source)
+        QBCore.Functions.CreateUseableItem(item, function(source, slotData)
+            func(source, slotData and slotData.slot, slotData and (slotData.metadata or slotData.info) or {})
         end)
      elseif Shared.Framework == "QBOX" then
-        exports.qbx_core:CreateUseableItem(item, function(source, item)
-            func(source)
+        exports.qbx_core:CreateUseableItem(item, function(source, slotData)
+            func(source, slotData and slotData.slot, slotData and (slotData.metadata or slotData.info) or {})
         end)
     end
 end
@@ -21,7 +23,8 @@ Core.RegisterServerCallback('dh_lib:server:getItemData', function(source, cb, it
 end)
  
 Core.GetAllItems = function(source)
-    local playerItems = exports['codem-inventory']:GetInventory(source)
+    local identifier = Core.GetIdentifier(source)
+    local playerItems = exports['codem-inventory']:GetInventory(identifier, source)
     if not playerItems then return {} end
     local items = {}
     for _, item in pairs(playerItems) do

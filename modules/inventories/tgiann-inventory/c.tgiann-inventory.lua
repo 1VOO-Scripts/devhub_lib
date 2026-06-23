@@ -1,7 +1,10 @@
 if Shared.InventorySystem ~= "tgiann-inventory" then return end  
-local Items = exports["tgiann-inventory"]:ItemsRaw()
+local Items = nil
 
 Core.GetItemData = function(itemName) 
+    if not Items then
+        Items = exports["tgiann-inventory"]:ItemsRaw()
+    end
     local itemData = Items[itemName]
     if not itemData then return nil end
     return { 

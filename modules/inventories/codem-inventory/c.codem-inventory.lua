@@ -1,6 +1,9 @@
 if Shared.InventorySystem ~= "codem-inventory" then return end  
-local Items = exports['codem-inventory']:GetItemList()
+local Items = nil
 Core.GetItemData = function(itemName) 
+    if not Items then
+        Items = exports['codem-inventory']:GetItemList()
+    end
     local itemData = Items[itemName]
     return { 
         name = itemName,
